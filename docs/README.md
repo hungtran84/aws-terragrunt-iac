@@ -16,14 +16,10 @@ Comprehensive guide to resource naming standards:
 - Naming patterns and formats
 - Resource-specific naming rules
 - AWS resource limits
-- Examples and best practices
-
-### [Naming Quick Reference](README_NAMING.md)
-Quick reference guide for using naming conventions:
 - Quick start examples
 - Available naming functions
 - Common tags
-- Usage patterns
+- Usage patterns and best practices
 
 ## Quick Links
 

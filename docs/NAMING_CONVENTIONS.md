@@ -8,7 +8,32 @@ All resources follow a consistent naming pattern to ensure:
 - **Consistency**: Same naming pattern across all resources
 - **Traceability**: Easy to identify environment, region, and resource type
 - **Compliance**: Meet AWS resource naming requirements
-- **Automation**: Automatic name generation via `common.hcl`
+- **Automation**: Automatic name generation via `global.hcl`
+
+## Quick Start
+
+Naming conventions are automatically available in all Terragrunt configurations:
+
+```hcl
+include "root" {
+  path = find_in_parent_folders()
+}
+
+locals {
+  # Load global configuration
+  global = read_terragrunt_config(find_in_parent_folders("global.hcl")).locals
+  
+  # Extract environment and region from path
+  environment = local.path_parts[local.live_index + 1]
+  region      = local.path_parts[local.live_index + 2]
+  
+  # Get region short code from global config
+  region_short = try(local.global.region_short_map[local.region], "unknown")
+  
+  # Generate resource names
+  bucket_name = "${local.global.project_name}-${local.environment}-${local.region_short}-state"
+}
+```
 
 ## Naming Pattern
 
@@ -22,21 +47,22 @@ All resources follow a consistent naming pattern to ensure:
 
 | Component | Description | Example | Max Length |
 |-----------|-------------|---------|------------|
-| `project` | Project name | `terragrunt-layers` | 20 |
+| `project` | Project name | `acme-platform` | 20 |
 | `environment` | Environment (dev, staging, prod) | `dev` | 10 |
 | `region` | AWS region (shortened) | `apse1` (from ap-southeast-1) | 10 |
 | `resource-type` | Resource type | `vpc`, `eks`, `mwaa` | 20 |
 | `identifier` | Optional identifier | `main`, `worker` | 20 |
 
-### Examples
+### Example Names
 
 | Resource Type | Full Name | Short Name |
 |--------------|-----------|------------|
-| VPC | `terragrunt-layers-dev-apse1-vpc` | `dev-apse1-vpc` |
+| S3 Bucket | `acme-platform-dev-apse1-state` | `dev-apse1-state` |
+| DynamoDB Table | `acme-platform-dev-apse1-locks` | `dev-apse1-locks` |
 | EKS Cluster | `dev-apse1-eks-cluster` | `dev-apse1-eks` |
-| S3 Bucket | `terragrunt-layers-dev-apse1-state` | `dev-apse1-state` |
-| IAM Role | `terragrunt-dev-apse1-eks-role` | `dev-apse1-eks-role` |
-| Security Group | `terragrunt-layers-dev-apse1-eks-sg` | `dev-apse1-eks-sg` |
+| VPC | `acme-platform-dev-apse1-vpc` | `dev-apse1-vpc` |
+| IAM Role | `acme-plat-dev-apse1-eks-role` | `dev-apse1-eks-role` |
+| Security Group | `acme-platform-dev-apse1-eks-sg` | `dev-apse1-eks-sg` |
 
 ## Resource-Specific Naming
 
@@ -50,7 +76,7 @@ All resources follow a consistent naming pattern to ensure:
 - No underscores
 - 3-63 characters
 
-**Example**: `terragrunt-layers-dev-apse1-state`
+**Example**: `acme-platform-dev-apse1-state`
 
 ### DynamoDB Tables
 
@@ -60,7 +86,7 @@ All resources follow a consistent naming pattern to ensure:
 - Alphanumeric and hyphens only
 - Max 255 characters
 
-**Example**: `terragrunt-layers-dev-apse1-locks`
+**Example**: `acme-platform-dev-apse1-locks`
 
 ### KMS Keys
 
@@ -70,7 +96,7 @@ All resources follow a consistent naming pattern to ensure:
 - Forward slashes allowed
 - Max 256 characters
 
-**Example**: `alias/terragrunt-layers/dev/apse1/eks`
+**Example**: `alias/acme-platform/dev/apse1/eks`
 
 ### IAM Roles
 
@@ -79,8 +105,9 @@ All resources follow a consistent naming pattern to ensure:
 **Rules**:
 - Max 64 characters
 - Alphanumeric and `+=,.@-_` allowed
+- Project name truncated to fit within limits
 
-**Example**: `terragrunt-dev-apse1-eks-role`
+**Example**: `acme-plat-dev-apse1-eks-role`
 
 ### Security Groups
 
@@ -90,7 +117,7 @@ All resources follow a consistent naming pattern to ensure:
 - Max 255 characters
 - Alphanumeric and hyphens only
 
-**Example**: `terragrunt-layers-dev-apse1-eks-sg`
+**Example**: `acme-platform-dev-apse1-eks-sg`
 
 ### CloudWatch Log Groups
 
@@ -100,7 +127,7 @@ All resources follow a consistent naming pattern to ensure:
 - Forward slashes allowed
 - Max 512 characters
 
-**Example**: `/aws/terragrunt-layers/dev/apse1/eks`
+**Example**: `/aws/acme-platform/dev/apse1/eks`
 
 ### EKS Clusters
 
@@ -116,24 +143,33 @@ All resources follow a consistent naming pattern to ensure:
 
 **Format**: `{project}-{env}-{region}-vpc`
 
-**Example**: `terragrunt-layers-dev-apse1-vpc`
+**Example**: `acme-platform-dev-apse1-vpc`
 
 ### Subnets
 
 **Format**: `{project}-{env}-{region}-{type}-subnet-{az}`
 
-**Example**: `terragrunt-layers-dev-apse1-public-subnet-1a`
+**Example**: `acme-platform-dev-apse1-public-subnet-1a`
 
 ## Region Shortening
 
-To keep names within AWS limits, regions are shortened:
+To keep names within AWS limits, regions are shortened using a mapping defined in `global.hcl`:
 
 | Full Region | Shortened |
 |-------------|-----------|
 | `ap-southeast-1` | `apse1` |
-| `us-east-1` | `useast1` |
-| `us-west-2` | `uswest2` |
-| `eu-west-1` | `euwest1` |
+| `ap-southeast-2` | `apse2` |
+| `ap-northeast-1` | `apne1` |
+| `us-east-1` | `usea1` |
+| `us-west-2` | `uswe2` |
+| `eu-west-1` | `euwe1` |
+| `eu-central-1` | `euce1` |
+
+The region short code follows the pattern: `{prefix}{direction}{number}`
+- `ap-southeast-1` → `ap` + `se` (southeast) + `1` = `apse1`
+- `us-east-1` → `us` + `ea` (east) + `1` = `usea1`
+
+See `live/global.hcl` for the complete region mapping.
 
 ## Environment Codes
 
@@ -147,58 +183,68 @@ To keep names within AWS limits, regions are shortened:
 
 | Layer | Code |
 |-------|------|
-| Layer 0 - Foundation | `l0-foundation` |
-| Layer 1 - Networking | `l1-networking` |
-| Layer 2 - Workloads | `l2-workloads` |
-| Layer 3 - Apps | `l3-apps` |
+| Layer 0 - Foundation | `layer0-foundation` |
+| Layer 1 - Networking | `layer1-networking` |
+| Layer 2 - Workloads | `layer2-workloads` |
+| Layer 3 - Apps | `layer3-apps` |
 
-## Usage
+## Usage in Terragrunt Configurations
 
-### In Terragrunt Configurations
-
-The naming conventions are automatically available via `common.hcl`:
+The naming conventions are automatically available via `global.hcl`:
 
 ```hcl
 include "root" {
   path = find_in_parent_folders()
 }
 
-inputs = {
-  # Use naming convention
-  bucket_name = dependency.common.outputs.naming_convention.s3_bucket
+locals {
+  # Load global configuration
+  global = read_terragrunt_config(find_in_parent_folders("global.hcl")).locals
   
-  # Use common tags
-  tags = dependency.common.outputs.common_tags
+  # Extract path components: live/{env}/{region}/...
+  path_parts = split("/", get_terragrunt_dir())
+  live_index = index(local.path_parts, "live")
+  
+  # Extract environment and region from path
+  environment = local.path_parts[local.live_index + 1]
+  region      = local.path_parts[local.live_index + 2]
+  
+  # Get region short code from global config
+  region_short = try(local.global.region_short_map[local.region], "unknown")
+  
+  # Generate resource names
+  bucket_name = "${local.global.project_name}-${local.environment}-${local.region_short}-state"
+  table_name  = "${local.global.project_name}-${local.environment}-${local.region_short}-locks"
 }
 ```
 
-### In Terraform Modules
+## Common Tags
 
-Access via variables:
+Common tags are automatically applied via environment-specific configuration:
 
 ```hcl
-variable "naming_convention" {
-  description = "Naming convention from common.hcl"
-  type = object({
-    resource_name = string
-    s3_bucket     = string
-    # ... other naming functions
-  })
-}
+# Load environment-specific configuration
+live_dir = join("/", slice(local.path_parts, 0, local.live_index + 1))
+env = read_terragrunt_config("${local.live_dir}/${local.environment}/env.hcl").locals
 
-resource "aws_s3_bucket" "main" {
-  bucket = var.naming_convention.s3_bucket
-  tags   = var.common_tags
-}
+# Common tags
+common_tags = merge(
+  local.global.base_tags,
+  {
+    Environment = local.environment
+    Region      = local.region
+  },
+  try(local.env.environment_tags, {})
+)
 ```
 
-## Best Practices
-
-1. **Always use `common.hcl`**: Don't hardcode names
-2. **Follow the pattern**: Use the standard format for all resources
-3. **Keep it short**: Use shortened region codes when needed
-4. **Be consistent**: Same resource type = same naming pattern
-5. **Document exceptions**: If a resource can't follow the pattern, document why
+Tags include:
+- `Project` - Project name (e.g., `acme-platform`)
+- `Environment` - Environment (dev, staging, prod)
+- `Region` - AWS region
+- `CreatedBy` - Always "Terraform"
+- `ManagedBy` - Always "Terraform"
+- Environment-specific tags (CostCenter, Owner, etc.)
 
 ## AWS Resource Limits
 
@@ -213,35 +259,67 @@ resource "aws_s3_bucket" "main" {
 | EKS Cluster | 100 | alphanumeric, hyphens |
 | VPC | 255 | alphanumeric, hyphens |
 
-## Enforcement
+## Best Practices
 
-Naming conventions are enforced via:
-- `common.hcl` - Automatic name generation
-- Terraform validation rules - Validate names in modules
-- CI/CD checks - Pre-commit hooks to validate naming
+1. **Always use `global.hcl`**: Don't hardcode names or region mappings
+2. **Follow the pattern**: Use the standard format for all resources
+3. **Keep it short**: Use shortened region codes from `global.hcl`
+4. **Be consistent**: Same resource type = same naming pattern
+5. **Document exceptions**: If a resource can't follow the pattern, document why
+6. **Extract from path**: Environment and region should be extracted from directory structure
 
 ## Examples
 
 ### Example 1: S3 Bucket for Terraform State
 
 ```hcl
-# Automatically generated name
-bucket_name = "terragrunt-layers-dev-apse1-state"
+locals {
+  global = read_terragrunt_config(find_in_parent_folders("global.hcl")).locals
+  environment = "dev"
+  region = "ap-southeast-1"
+  region_short = try(local.global.region_short_map[local.region], "unknown")
+  
+  bucket_name = "${local.global.project_name}-${local.environment}-${local.region_short}-state"
+  # Result: "acme-platform-dev-apse1-state"
+}
 ```
 
 ### Example 2: EKS Cluster
 
 ```hcl
-# Automatically generated name
-cluster_name = "dev-apse1-eks-cluster"
+locals {
+  global = read_terragrunt_config(find_in_parent_folders("global.hcl")).locals
+  environment = "dev"
+  region = "ap-southeast-1"
+  region_short = try(local.global.region_short_map[local.region], "unknown")
+  
+  cluster_name = "${local.environment}-${local.region_short}-eks-cluster"
+  # Result: "dev-apse1-eks-cluster"
+}
 ```
 
 ### Example 3: VPC
 
 ```hcl
-# Automatically generated name
-vpc_name = "terragrunt-layers-dev-apse1-vpc"
+locals {
+  global = read_terragrunt_config(find_in_parent_folders("global.hcl")).locals
+  environment = "dev"
+  region = "ap-southeast-1"
+  region_short = try(local.global.region_short_map[local.region], "unknown")
+  
+  vpc_name = "${local.global.project_name}-${local.environment}-${local.region_short}-vpc"
+  # Result: "acme-platform-dev-apse1-vpc"
+}
 ```
+
+## Enforcement
+
+Naming conventions are enforced via:
+- `global.hcl` - Centralized project name and region mapping
+- `live/{env}/env.hcl` - Environment-specific tags
+- Path-based extraction - Environment and region extracted from directory structure
+- Terraform validation rules - Validate names in modules
+- CI/CD checks - Pre-commit hooks to validate naming
 
 ## Migration
 
@@ -250,4 +328,3 @@ If you have existing resources with different naming:
 2. Plan migration to new convention
 3. Update resources gradually
 4. Update documentation
-

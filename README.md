@@ -37,8 +37,7 @@ terragrunt-layers/
 │       └── eks-enterprise/         # EKS wrapper with company policies
 ├── docs/                           # documentation
 │   ├── VERSION_MANAGEMENT.md
-│   ├── NAMING_CONVENTIONS.md
-│   └── README_NAMING.md
+│   └── NAMING_CONVENTIONS.md
 └── scripts/                        # utility scripts
     └── check-versions.sh
 ```
@@ -170,9 +169,9 @@ terragrunt run-all apply --terragrunt-include-dir layer3-apps
 
 | Repository | Purpose |
 |------------|---------|
-| terragrunt-layers | Main IaC repo — defines all infra layers |
+| terragrunt-iac | Main IaC repo — defines all infra layers |
 | terraform-modules | Internal reusable Terraform modules (used when no official module fits) |
-| argo-apps | GitOps repo managed by ArgoCD — deploys workloads and apps on top of EKS |
+| argocd-apps | GitOps repo managed by ArgoCD — deploys workloads and apps on top of EKS |
 | terragrunt-layers-foundation (optional) | Minimal repo for Layer 0 Foundation setup (S3 + DynamoDB) |
 
 ---
@@ -186,16 +185,6 @@ This repo's name — **terragrunt-layers** — reflects:
 - **Scalable foundation** — supports multi-env, multi-account, multi-region AWS setup.
 
 Simple, professional, and scalable — the backbone of your AWS platform.
-
----
-
-## 🧭 Example Naming Extensions
-
-| Repo Name | Role |
-|-----------|------|
-| terragrunt-layers-modules | Custom Terraform modules |
-| terragrunt-layers-apps | ArgoCD-managed application manifests |
-| terragrunt-layers-observability | Monitoring, logging, and metrics setup |
 
 ---
 
@@ -224,8 +213,7 @@ Quick check: `make check-versions` or `./scripts/check-versions.sh`
 | Document | Description |
 |----------|-------------|
 | [Version Management](docs/VERSION_MANAGEMENT.md) | How to install and manage Terraform/Terragrunt versions |
-| [Naming Conventions](docs/NAMING_CONVENTIONS.md) | Resource naming standards and patterns |
-| [Naming Quick Reference](docs/README_NAMING.md) | Quick guide for using naming conventions |
+| [Naming Conventions](docs/NAMING_CONVENTIONS.md) | Resource naming standards, patterns, and quick reference |
 
 ---
 
