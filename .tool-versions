@@ -1,0 +1,8 @@
+# asdf version manager configuration
+# Install asdf: https://asdf-vm.com/guide/getting-started.html
+# Then run: asdf install
+
+terraform 1.6.0
+terragrunt 0.55.0
+
+

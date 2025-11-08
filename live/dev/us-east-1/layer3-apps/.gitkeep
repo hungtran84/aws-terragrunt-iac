@@ -1,0 +1,4 @@
+# This file ensures the layer3-apps directory is tracked in git
+# Add application configurations (ArgoCD, add-ons, etc.) here
+
+

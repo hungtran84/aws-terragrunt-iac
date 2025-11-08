@@ -1,0 +1,28 @@
+# Pre-commit hooks for version checking and code quality
+# Install: pip install pre-commit && pre-commit install
+
+repos:
+  - repo: local
+    hooks:
+      - id: check-versions
+        name: Check Terraform and Terragrunt versions
+        entry: bash -c './scripts/check-versions.sh'
+        language: system
+        pass_filenames: false
+        always_run: true
+
+  - repo: https://github.com/antonbabenko/pre-commit-terraform
+    rev: v1.86.0
+    hooks:
+      - id: terraform_fmt
+        args:
+          - --args=-diff
+          - --args=-check
+      - id: terraform_validate
+      - id: terraform_docs
+        args:
+          - --args=--hook-config=--path-to-file=README.md
+          - --args=--hook-config=--add-to-existing-file=true
+          - --args=--hook-config=--create-file-if-not-exist=true
+
+
