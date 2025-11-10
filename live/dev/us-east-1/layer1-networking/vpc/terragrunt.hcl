@@ -1,9 +1,6 @@
 # Layer 1 - Networking: VPC
 # Core network and connectivity foundation
 # Using official terraform-aws-modules VPC module
-include "root" {
-  path = find_in_parent_folders()
-}
 
 terraform {
   # Use git source with specific version to avoid deprecation warnings

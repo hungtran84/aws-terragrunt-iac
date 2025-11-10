@@ -1,14 +1,10 @@
 # Layer 0 - Foundation
 # Bootstrap infrastructure: S3 bucket for Terraform state, DynamoDB lock table, etc.
 # Note: This layer must be deployed manually first (chicken-and-egg problem)
-include "root" {
-  path = find_in_parent_folders()
-}
 
 # Example: Using official terraform-aws-modules for S3 bucket
 terraform {
-  source = "terraform-aws-modules/s3-bucket/aws"
-  version = "~> 4.0"
+  source = "git::https://github.com/terraform-aws-modules/terraform-aws-s3-bucket.git?ref=v4.4.0"
 }
 
 inputs = {

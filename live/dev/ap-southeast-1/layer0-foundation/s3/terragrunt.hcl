@@ -1,8 +1,5 @@
 # Layer 0 - Foundation: S3 Bucket for Terraform State
 # Note: This must be deployed manually first (chicken-and-egg problem)
-include "root" {
-  path = find_in_parent_folders()
-}
 
 # Load configuration files
 locals {

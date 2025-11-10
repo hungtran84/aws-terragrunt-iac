@@ -1,12 +1,9 @@
 # Layer 2 - Workloads: EKS Cluster (Enterprise Wrapper)
 # Platform-level managed services and compute layer
 # Using custom enterprise wrapper module that enforces company security policies
-include "root" {
-  path = find_in_parent_folders()
-}
 
 terraform {
-  source = "../../../../modules/custom-modules/eks-enterprise"
+  source = "../../../../../modules/custom-modules/eks-enterprise"
 }
 
 # Dependencies on layer1-networking outputs would be referenced here

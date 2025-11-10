@@ -1,8 +1,5 @@
 # Layer 0 - Foundation: DynamoDB Table for Terraform State Locking
 # Note: This must be deployed manually first (chicken-and-egg problem)
-include "root" {
-  path = find_in_parent_folders()
-}
 
 # Load configuration files
 locals {

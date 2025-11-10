@@ -1,12 +1,9 @@
 # Layer 2 - Workloads: MWAA (Managed Workflows for Apache Airflow)
 # Platform-level managed services - Example of custom module usage
-include "root" {
-  path = find_in_parent_folders()
-}
 
 # Using custom module as there's no official terraform-aws-modules for MWAA
 terraform {
-  source = "../../../../modules/custom-modules/mwaa"
+  source = "../../../../../modules/custom-modules/mwaa"
 }
 
 # Dependencies on layer1-networking outputs would be referenced here
