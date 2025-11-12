@@ -44,6 +44,11 @@ output "cluster_oidc_issuer_url" {
   value       = module.eks.cluster_oidc_issuer_url
 }
 
+output "oidc_provider_arn" {
+  description = "ARN of the OIDC Provider for EKS"
+  value       = module.eks.oidc_provider_arn
+}
+
 output "eks_managed_node_groups" {
   description = "Map of attribute maps for all EKS managed node groups created"
   value       = module.eks.eks_managed_node_groups
@@ -52,12 +57,12 @@ output "eks_managed_node_groups" {
 # Additional outputs for company compliance
 output "kms_key_id" {
   description = "KMS key ID used for EKS encryption"
-  value       = aws_kms_key.eks.id
+  value       = module.eks.kms_key_id
 }
 
 output "kms_key_arn" {
   description = "KMS key ARN used for EKS encryption"
-  value       = aws_kms_key.eks.arn
+  value       = module.eks.kms_key_arn
 }
 
 output "compliance_security_group_id" {
@@ -65,4 +70,41 @@ output "compliance_security_group_id" {
   value       = aws_security_group.eks_compliance.id
 }
 
+output "ebs_csi_driver_iam_role_arn" {
+  description = "IAM role ARN for EBS CSI driver"
+  value       = try(aws_iam_role.ebs_csi_driver[0].arn, null)
+}
 
+output "ebs_csi_driver_iam_role_name" {
+  description = "IAM role name for EBS CSI driver"
+  value       = try(aws_iam_role.ebs_csi_driver[0].name, null)
+}
+
+################################################################################
+# Karpenter Outputs
+################################################################################
+
+output "karpenter_enabled" {
+  description = "Whether Karpenter is enabled"
+  value       = var.enable_karpenter
+}
+
+output "karpenter_controller_iam_role_arn" {
+  description = "IAM role ARN for Karpenter controller"
+  value       = var.enable_karpenter ? module.karpenter[0].controller_iam_role_arn : null
+}
+
+output "karpenter_node_instance_profile_name" {
+  description = "Instance profile name for Karpenter-provisioned nodes"
+  value       = var.enable_karpenter ? module.karpenter[0].node_instance_profile_name : null
+}
+
+output "karpenter_node_iam_role_arn" {
+  description = "IAM role ARN for Karpenter-provisioned nodes"
+  value       = var.enable_karpenter ? module.karpenter[0].node_iam_role_arn : null
+}
+
+output "karpenter_namespace" {
+  description = "Kubernetes namespace where Karpenter is installed"
+  value       = var.enable_karpenter ? var.karpenter_namespace : null
+}

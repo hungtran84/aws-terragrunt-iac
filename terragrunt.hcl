@@ -1,68 +1,68 @@
 # Root Terragrunt configuration
 # This file contains shared configuration that can be inherited by all environments and layers
 
-# Common configuration (naming conventions, tags, etc.)
-# Merged from common.hcl to avoid nested includes
 locals {
+  # Import global configuration
+  global = read_terragrunt_config(find_in_parent_folders("global.hcl")).locals
+  
   # Extract path components for naming
   # Path format: live/{env}/{region}/{layer}/{resource}
   path_parts = split("/", get_terragrunt_dir())
-  path_len = length(local.path_parts)
   
-  # Get environment from path (live/{env}/...) - index 1 from start
-  environment = try(
-    element(local.path_parts, 1),
+  # Find the "live" directory index for consistent parsing
+  live_index = try(
+    index(local.path_parts, "live"),
+    -1
+  )
+  
+  # Validate that we found "live" directory
+  has_live_dir = local.live_index >= 0
+  
+  # Extract environment and region relative to "live" directory
+  environment = local.has_live_dir ? try(
+    local.path_parts[local.live_index + 1],
     get_env("ENVIRONMENT", "dev")
-  )
+  ) : get_env("ENVIRONMENT", "dev")
   
-  # Get region from path (live/{env}/{region}/...) - index 2 from start
-  region = try(
-    element(local.path_parts, 2),
+  region = local.has_live_dir ? try(
+    local.path_parts[local.live_index + 2],
     get_env("AWS_REGION", "us-east-1")
-  )
+  ) : get_env("AWS_REGION", "us-east-1")
   
-  # Get layer from path (live/{env}/{region}/{layer}/...) - index 3 from start
-  layer = try(
-    element(local.path_parts, 3),
+  # Get layer and resource (optional, for enhanced naming)
+  layer = local.has_live_dir ? try(
+    local.path_parts[local.live_index + 3],
+    "unknown"
+  ) : "unknown"
+  
+  resource_name = local.has_live_dir ? try(
+    local.path_parts[local.live_index + 4],
+    "default"
+  ) : "default"
+  
+  # Use global region mapping for consistent short codes
+  region_short = try(
+    local.global.region_short_map[local.region],
     "unknown"
   )
   
-  # Get resource name from path (live/{env}/{region}/{layer}/{resource}) - index 4 from start
-  resource_name = try(
-    element(local.path_parts, 4),
-    "default"
-  )
+  # Standard resource naming using global project name
+  resource_prefix = "${local.global.project_name}-${local.environment}-${local.region_short}"
+  resource_name_standard = "${local.resource_prefix}-${local.resource_name}"
   
-  # Project name
-  project_name = "acme-platform"
-  
-  # Region shortening - convert full region names to short codes
-  region_short = replace(
-    replace(
-      replace(
-        replace(local.region, "ap-southeast-1", "apse1"),
-        "us-east-1", "useast1"
-      ),
-      "us-west-2", "uswest2"
-    ),
-    "eu-west-1", "euwest1"
-  )
-  
-  # Standard resource name
-  resource_name_standard = "${local.project_name}-${local.environment}-${local.region_short}-${local.resource_name}"
-  
-  # Short resource name
+  # Short resource name  
   short_name = "${local.environment}-${local.region_short}-${local.resource_name}"
   
-  # Common tags applied to all resources
-  common_tags_base = {
-    Project     = local.project_name
-    Environment = local.environment
-    Region      = local.region
-    Layer       = local.layer
-    ManagedBy   = "Terraform"
-    Repository  = "terragrunt-layers"
-  }
+  # Common tags applied to all resources - merge global + local
+  common_tags_base = merge(
+    local.global.base_tags,
+    {
+      Environment = local.environment
+      Region      = local.region
+      Layer       = local.layer
+      Repository  = "aws-terragrunt-iac"
+    }
+  )
   
   # Environment-specific tags
   environment_tags_dev = {
@@ -93,11 +93,11 @@ locals {
 remote_state {
   backend = "s3"
   config = {
-    bucket         = get_env("TF_STATE_BUCKET", "terraform-state-${get_env("ENVIRONMENT", "dev")}-${get_env("AWS_REGION", "us-east-1")}")
+    bucket         = get_env("TF_STATE_BUCKET", "${local.resource_prefix}-state")
     key            = "${path_relative_to_include()}/terraform.tfstate"
-    region         = get_env("AWS_REGION", "us-east-1")
+    region         = local.region
     encrypt        = true
-    dynamodb_table = get_env("TF_LOCK_TABLE", "terraform-locks")
+    dynamodb_table = get_env("TF_LOCK_TABLE", "${local.resource_prefix}-locks")
   }
 }
 
@@ -111,14 +111,14 @@ inputs = {
   naming_convention = {
     resource_name        = local.resource_name_standard
     short_name          = local.short_name
-    s3_bucket           = "${local.project_name}-${local.environment}-${local.region_short}-${local.resource_name}"
-    dynamodb_table      = "${local.project_name}-${local.environment}-${local.region_short}-${local.resource_name}"
-    kms_alias           = "alias/${local.project_name}/${local.environment}/${local.region_short}/${local.resource_name}"
-    iam_role            = "${substr(local.project_name, 0, 8)}-${local.environment}-${substr(local.region_short, 0, 6)}-${substr(local.resource_name, 0, 10)}-role"
-    security_group      = "${local.project_name}-${local.environment}-${local.region_short}-${local.resource_name}-sg"
-    cloudwatch_log_group = "/aws/${local.project_name}/${local.environment}/${local.region_short}/${local.resource_name}"
+    s3_bucket           = "${local.global.project_name}-${local.environment}-${local.region_short}-${local.resource_name}"
+    dynamodb_table      = "${local.global.project_name}-${local.environment}-${local.region_short}-${local.resource_name}"
+    kms_alias           = "alias/${local.global.project_name}/${local.environment}/${local.region_short}/${local.resource_name}"
+    iam_role            = "${substr(local.global.project_name, 0, 8)}-${local.environment}-${substr(local.region_short, 0, 6)}-${substr(local.resource_name, 0, 10)}-role"
+    security_group      = "${local.global.project_name}-${local.environment}-${local.region_short}-${local.resource_name}-sg"
+    cloudwatch_log_group = "/aws/${local.global.project_name}/${local.environment}/${local.region_short}/${local.resource_name}"
     eks_cluster         = "${local.environment}-${local.region_short}-${local.resource_name}"
-    vpc                 = "${local.project_name}-${local.environment}-${local.region_short}-vpc"
+    vpc                 = "${local.global.project_name}-${local.environment}-${local.region_short}-vpc"
   }
   
   # Common tags (automatically includes environment-specific tags)
@@ -127,7 +127,8 @@ inputs = {
   # Environment and region
   environment  = local.environment
   aws_region   = local.region
+  region_short = local.region_short
   layer        = local.layer
-  project_name = local.project_name
+  project_name = local.global.project_name
 }
 

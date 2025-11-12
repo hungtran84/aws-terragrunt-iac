@@ -3,11 +3,22 @@
 # and stricter defaults
 terraform {
   required_version = ">= 1.0"
-  
+
+  # Backend configuration - will be configured by Terragrunt
+  backend "s3" {}
+
   required_providers {
     aws = {
       source  = "hashicorp/aws"
       version = "~> 5.0"
+    }
+    kubernetes = {
+      source  = "hashicorp/kubernetes"
+      version = ">= 2.23"
+    }
+    helm = {
+      source  = "hashicorp/helm"
+      version = ">= 2.9"
     }
   }
 }
@@ -17,31 +28,33 @@ module "eks" {
   source  = "terraform-aws-modules/eks/aws"
   version = "~> 20.0"
 
-  cluster_name    = var.cluster_name
-  cluster_version = var.cluster_version
+  cluster_name = var.cluster_name
+  # Security: Enforce minimum cluster version (company policy)
+  cluster_version = var.cluster_version >= "1.28" ? var.cluster_version : "1.28"
 
   # Network configuration
   vpc_id     = var.vpc_id
   subnet_ids = var.subnet_ids
 
   # Security: Enforce private endpoint (company policy)
-  cluster_endpoint_private_access = true
-  cluster_endpoint_public_access  = var.allow_public_access
+  cluster_endpoint_private_access      = true
+  cluster_endpoint_public_access       = var.allow_public_access
   cluster_endpoint_public_access_cidrs = var.allow_public_access ? var.allowed_public_cidrs : []
 
   # Security: Enable encryption
   cluster_enabled_log_types              = var.enabled_log_types
-  create_cloudwatch_log_group           = true
+  create_cloudwatch_log_group            = true
   cloudwatch_log_group_retention_in_days = var.log_retention_days
 
   # Security: Enable encryption at rest
-  cluster_encryption_config = [{
-    provider_key_arn = aws_kms_key.eks.arn
-    resources        = ["secrets"]
-  }]
+  cluster_encryption_config = {
+    resources = ["secrets"]
+  }
 
-  # Security: Enforce minimum cluster version (company policy)
-  cluster_version = var.cluster_version >= "1.28" ? var.cluster_version : "1.28"
+  # Use the KMS key from the EKS module instead of custom key
+  create_kms_key                = true
+  kms_key_description           = "EKS cluster encryption key for ${var.cluster_name}"
+  kms_key_enable_default_policy = true
 
   # Security: Enable control plane logging (company requirement)
   enable_cluster_creator_admin_permissions = false
@@ -50,7 +63,7 @@ module "eks" {
   eks_managed_node_groups = {
     for k, v in var.node_groups : k => {
       # Security: Enforce minimum instance types (company policy)
-      instance_types = [for it in v.instance_types : 
+      instance_types = [for it in v.instance_types :
         contains(var.allowed_instance_types, it) ? it : var.default_instance_type
       ]
 
@@ -62,7 +75,6 @@ module "eks" {
             volume_size           = v.disk_size
             volume_type           = "gp3"
             encrypted             = true
-            kms_key_id            = aws_kms_key.eks.arn
             delete_on_termination = true
           }
         }
@@ -71,7 +83,7 @@ module "eks" {
       # Security: Enforce IMDSv2 (company security policy)
       metadata_options = {
         http_endpoint               = "enabled"
-        http_tokens                 = "required"  # Enforce IMDSv2
+        http_tokens                 = "required" # Enforce IMDSv2
         http_put_response_hop_limit = 2
       }
 
@@ -121,7 +133,8 @@ module "eks" {
       most_recent = true
     }
     aws-ebs-csi-driver = {
-      most_recent = true
+      most_recent              = true
+      service_account_role_arn = aws_iam_role.ebs_csi_driver[0].arn
     }
   }
 
@@ -165,53 +178,67 @@ module "eks" {
   )
 }
 
-# Security: KMS key for EKS encryption (company requirement)
-resource "aws_kms_key" "eks" {
-  description             = "KMS key for EKS cluster encryption - ${var.cluster_name}"
-  deletion_window_in_days = var.kms_deletion_window
-  enable_key_rotation     = true
+# Note: KMS key is now managed by the EKS module itself
 
-  policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Sid    = "Enable IAM User Permissions"
-        Effect = "Allow"
-        Principal = {
-          AWS = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:root"
-        }
-        Action   = "kms:*"
-        Resource = "*"
-      },
-      {
-        Sid    = "Allow EKS to use the key"
-        Effect = "Allow"
-        Principal = {
-          Service = "eks.amazonaws.com"
-        }
-        Action = [
-          "kms:Encrypt",
-          "kms:Decrypt",
-          "kms:ReEncrypt*",
-          "kms:GenerateDataKey*",
-          "kms:DescribeKey"
-        ]
-        Resource = "*"
-      }
-    ]
-  })
+################################################################################
+# EBS CSI Driver IAM Role
+################################################################################
+
+data "aws_iam_policy_document" "ebs_csi_driver_assume_role" {
+  count = local.create ? 1 : 0
+
+  statement {
+    actions = ["sts:AssumeRoleWithWebIdentity"]
+    effect  = "Allow"
+
+    condition {
+      test     = "StringEquals"
+      variable = "${replace(module.eks.cluster_oidc_issuer_url, "https://", "")}:sub"
+      values   = ["system:serviceaccount:kube-system:ebs-csi-controller-sa"]
+    }
+
+    condition {
+      test     = "StringEquals"
+      variable = "${replace(module.eks.cluster_oidc_issuer_url, "https://", "")}:aud"
+      values   = ["sts.amazonaws.com"]
+    }
+
+    principals {
+      identifiers = [module.eks.oidc_provider_arn]
+      type        = "Federated"
+    }
+  }
+}
+
+resource "aws_iam_role" "ebs_csi_driver" {
+  count = local.create ? 1 : 0
+
+  name               = "${var.cluster_name}-ebs-csi-driver"
+  assume_role_policy = data.aws_iam_policy_document.ebs_csi_driver_assume_role[0].json
 
   tags = merge(
     var.common_tags,
     {
-      Name = "${var.cluster_name}-eks-key"
+      Name                      = "${var.cluster_name}-ebs-csi-driver"
+      "company/security-policy" = "strict"
+      "company/compliance"      = "required"
     }
   )
 }
 
-resource "aws_kms_alias" "eks" {
-  name          = "alias/${var.cluster_name}-eks"
-  target_key_id = aws_kms_key.eks.key_id
+resource "aws_iam_role_policy_attachment" "ebs_csi_driver" {
+  count = local.create ? 1 : 0
+
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonEBSCSIDriverPolicy"
+  role       = aws_iam_role.ebs_csi_driver[0].name
+}
+
+################################################################################
+# Local Variables
+################################################################################
+
+locals {
+  create = true
 }
 
 # Security: Additional security group for company compliance
@@ -239,4 +266,66 @@ resource "aws_security_group" "eks_compliance" {
 
 data "aws_caller_identity" "current" {}
 
+data "aws_region" "current" {}
 
+################################################################################
+# Karpenter Bootstrap Integration
+################################################################################
+
+module "karpenter" {
+  source = "../../eks-bootstrap/karpenter"
+  count  = var.enable_karpenter ? 1 : 0
+
+  aws_region                         = var.aws_region != "" ? var.aws_region : data.aws_region.current.name
+  cluster_name                       = module.eks.cluster_name
+  cluster_endpoint                   = module.eks.cluster_endpoint
+  cluster_certificate_authority_data = module.eks.cluster_certificate_authority_data
+  oidc_provider_arn                  = module.eks.oidc_provider_arn
+  oidc_provider_url                  = module.eks.cluster_oidc_issuer_url
+
+  namespace     = var.karpenter_namespace
+  chart_version = var.karpenter_chart_version
+  replicas      = var.karpenter_replicas
+
+  controller_resources = var.karpenter_controller_resources
+
+  # Auto-tag subnets and security groups for Karpenter discovery
+  subnet_selector_tags = {
+    "karpenter.sh/discovery" = module.eks.cluster_name
+  }
+
+  security_group_selector_tags = {
+    "karpenter.sh/discovery" = module.eks.cluster_name
+  }
+
+  tags = merge(
+    var.common_tags,
+    {
+      "company/component" = "karpenter"
+      "company/layer"     = "bootstrap"
+    }
+  )
+
+  depends_on = [
+    module.eks,
+    aws_iam_role.ebs_csi_driver
+  ]
+}
+
+# Auto-tag subnets for Karpenter discovery
+resource "aws_ec2_tag" "karpenter_subnet_discovery" {
+  for_each = var.enable_karpenter ? toset(var.private_subnet_ids) : []
+
+  resource_id = each.value
+  key         = "karpenter.sh/discovery"
+  value       = var.cluster_name
+}
+
+# Auto-tag node security group for Karpenter discovery
+resource "aws_ec2_tag" "karpenter_sg_discovery" {
+  count = var.enable_karpenter ? 1 : 0
+
+  resource_id = module.eks.node_security_group_id
+  key         = "karpenter.sh/discovery"
+  value       = var.cluster_name
+}

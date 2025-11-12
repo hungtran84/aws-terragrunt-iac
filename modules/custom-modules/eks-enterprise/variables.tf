@@ -7,7 +7,7 @@ variable "cluster_version" {
   description = "Kubernetes version (minimum 1.28 enforced by company policy)"
   type        = string
   default     = "1.28"
-  
+
   validation {
     condition     = can(regex("^1\\.(2[89]|[3-9][0-9])", var.cluster_version))
     error_message = "Cluster version must be 1.28 or higher (company policy)."
@@ -93,7 +93,7 @@ variable "ami_type" {
   description = "AMI type for nodes (company policy: enforce AL2)"
   type        = string
   default     = "AL2_x86_64"
-  
+
   validation {
     condition     = contains(["AL2_x86_64", "AL2_ARM_64", "AL2_x86_64_GPU"], var.ami_type)
     error_message = "AMI type must be AL2_x86_64, AL2_ARM_64, or AL2_x86_64_GPU (company policy)."
@@ -116,7 +116,7 @@ variable "log_retention_days" {
   description = "CloudWatch log retention in days (company policy: minimum 30 days)"
   type        = number
   default     = 30
-  
+
   validation {
     condition     = var.log_retention_days >= 30
     error_message = "Log retention must be at least 30 days (company policy)."
@@ -127,7 +127,7 @@ variable "kms_deletion_window" {
   description = "KMS key deletion window in days (company policy: minimum 7 days)"
   type        = number
   default     = 7
-  
+
   validation {
     condition     = var.kms_deletion_window >= 7
     error_message = "KMS deletion window must be at least 7 days (company policy)."
@@ -137,7 +137,7 @@ variable "kms_deletion_window" {
 variable "allowed_egress_cidrs" {
   description = "CIDR blocks allowed for egress traffic (company security policy)"
   type        = list(string)
-  default     = ["0.0.0.0/0"]  # Can be restricted to company endpoints
+  default     = ["0.0.0.0/0"] # Can be restricted to company endpoints
 }
 
 variable "common_tags" {
@@ -146,4 +146,60 @@ variable "common_tags" {
   default     = {}
 }
 
+################################################################################
+# Karpenter Bootstrap Configuration
+################################################################################
 
+variable "enable_karpenter" {
+  description = "Enable Karpenter installation as part of EKS bootstrap"
+  type        = bool
+  default     = false
+}
+
+variable "karpenter_namespace" {
+  description = "Kubernetes namespace for Karpenter"
+  type        = string
+  default     = "karpenter"
+}
+
+variable "karpenter_chart_version" {
+  description = "Karpenter Helm chart version"
+  type        = string
+  default     = "1.1.0"
+}
+
+variable "karpenter_replicas" {
+  description = "Number of Karpenter controller replicas for high availability"
+  type        = number
+  default     = 2
+}
+
+variable "karpenter_controller_resources" {
+  description = "Resource requests and limits for Karpenter controller pod"
+  type = object({
+    requests = object({
+      cpu    = string
+      memory = string
+    })
+    limits = object({
+      cpu    = string
+      memory = string
+    })
+  })
+  default = {
+    requests = {
+      cpu    = "1"
+      memory = "1Gi"
+    }
+    limits = {
+      cpu    = "1"
+      memory = "1Gi"
+    }
+  }
+}
+
+variable "aws_region" {
+  description = "AWS region for Karpenter configuration"
+  type        = string
+  default     = ""
+}
