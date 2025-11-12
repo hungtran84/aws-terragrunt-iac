@@ -65,4 +65,3 @@ locals {
     "cn-northwest-1" = "cnnw1"
   }
 }
-

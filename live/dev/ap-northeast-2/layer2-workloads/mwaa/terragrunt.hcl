@@ -2,7 +2,7 @@
 # Platform-level managed services - Example of custom module usage
 
 include "root" {
-  path = find_in_parent_folders()
+  path = find_in_parent_folders("root.hcl")
 }
 
 # Using custom module as there's no official terraform-aws-modules for MWAA
@@ -12,7 +12,7 @@ terraform {
 
 # Dependencies on layer1-networking outputs
 dependency "vpc" {
-  config_path = "../../layer1-networking/vpc"
+  config_path = "../../layer1-networking/vpc/vpc1"
   
   mock_outputs = {
     vpc_id                   = "vpc-12345678"

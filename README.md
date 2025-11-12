@@ -15,9 +15,9 @@ Each environment (e.g., `dev`, `staging`, `prod`) can span **multiple regions** 
 
 ```
 terragrunt-layers/
-├── terragrunt.hcl                  # root config (remote state, provider defaults)
-├── common.hcl                      # global naming conventions and shared utilities
 ├── live/                           # environment-specific configurations
+│   ├── root.hcl                    # root config (remote state, provider defaults)  
+│   ├── common-env.hcl              # global naming conventions and shared utilities
 │   ├── dev/
 │   │   ├── ap-southeast-1/
 │   │   │   ├── layer0-foundation/  # S3 bucket, DynamoDB, IAM roles

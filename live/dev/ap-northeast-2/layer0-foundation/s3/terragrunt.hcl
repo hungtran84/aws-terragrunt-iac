@@ -4,7 +4,7 @@
 # Load configuration files
 locals {
   # Load global configuration
-  global = read_terragrunt_config(find_in_parent_folders("global.hcl")).locals
+  global = read_terragrunt_config(find_in_parent_folders("global-env.hcl")).locals
   
   # Extract path components: live/{env}/{region}/...
   path_parts = split("/", get_terragrunt_dir())
@@ -71,27 +71,8 @@ terraform {
 EOF
 }
 
-# Generate provider configuration
-# Note: required_providers is already defined in the module's versions.tf
-generate "provider" {
-  path      = "provider.tf"
-  if_exists = "overwrite_terragrunt"
-  contents  = <<EOF
-# Provider configuration for S3 bucket
-# Note: required_providers is already defined in the module's versions.tf
-provider "aws" {
-  region = "${local.region}"
-  
-  default_tags {
-    tags = {
-      ManagedBy   = "Terraform"
-      Environment = "${local.environment}"
-      Project     = "terragrunt-layers"
-    }
-  }
-}
-EOF
-}
+# Provider configuration will be inherited from root.hcl
+# Only override the backend to use local state for foundation layer
 
 inputs = {
   bucket = local.bucket_name

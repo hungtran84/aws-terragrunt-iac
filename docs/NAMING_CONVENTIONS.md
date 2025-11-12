@@ -8,7 +8,7 @@ All resources follow a consistent naming pattern to ensure:
 - **Consistency**: Same naming pattern across all resources
 - **Traceability**: Easy to identify environment, region, and resource type
 - **Compliance**: Meet AWS resource naming requirements
-- **Automation**: Automatic name generation via `global.hcl`
+- **Automation**: Automatic name generation via `common-env.hcl`
 
 ## Quick Start
 
@@ -21,7 +21,7 @@ include "root" {
 
 locals {
   # Load global configuration
-  global = read_terragrunt_config(find_in_parent_folders("global.hcl")).locals
+  global = read_terragrunt_config(find_in_parent_folders("common-env.hcl")).locals
   
   # Extract environment and region from path
   environment = local.path_parts[local.live_index + 1]
@@ -153,7 +153,7 @@ locals {
 
 ## Region Shortening
 
-To keep names within AWS limits, regions are shortened using a mapping defined in `global.hcl`:
+To keep names within AWS limits, regions are shortened using a mapping defined in `common-env.hcl`:
 
 | Full Region | Shortened |
 |-------------|-----------|
@@ -169,7 +169,7 @@ The region short code follows the pattern: `{prefix}{direction}{number}`
 - `ap-southeast-1` → `ap` + `se` (southeast) + `1` = `apse1`
 - `us-east-1` → `us` + `ea` (east) + `1` = `usea1`
 
-See `live/global.hcl` for the complete region mapping.
+See `live/common-env.hcl` for the complete region mapping.
 
 ## Environment Codes
 
@@ -190,7 +190,7 @@ See `live/global.hcl` for the complete region mapping.
 
 ## Usage in Terragrunt Configurations
 
-The naming conventions are automatically available via `global.hcl`:
+The naming conventions are automatically available via `common-env.hcl`:
 
 ```hcl
 include "root" {
@@ -199,7 +199,7 @@ include "root" {
 
 locals {
   # Load global configuration
-  global = read_terragrunt_config(find_in_parent_folders("global.hcl")).locals
+  global = read_terragrunt_config(find_in_parent_folders("common-env.hcl")).locals
   
   # Extract path components: live/{env}/{region}/...
   path_parts = split("/", get_terragrunt_dir())
@@ -261,9 +261,9 @@ Tags include:
 
 ## Best Practices
 
-1. **Always use `global.hcl`**: Don't hardcode names or region mappings
+1. **Always use `common-env.hcl`**: Don't hardcode names or region mappings
 2. **Follow the pattern**: Use the standard format for all resources
-3. **Keep it short**: Use shortened region codes from `global.hcl`
+3. **Keep it short**: Use shortened region codes from `common-env.hcl`
 4. **Be consistent**: Same resource type = same naming pattern
 5. **Document exceptions**: If a resource can't follow the pattern, document why
 6. **Extract from path**: Environment and region should be extracted from directory structure
@@ -274,7 +274,7 @@ Tags include:
 
 ```hcl
 locals {
-  global = read_terragrunt_config(find_in_parent_folders("global.hcl")).locals
+  global = read_terragrunt_config(find_in_parent_folders("common-env.hcl")).locals
   environment = "dev"
   region = "ap-southeast-1"
   region_short = try(local.global.region_short_map[local.region], "unknown")
@@ -288,7 +288,7 @@ locals {
 
 ```hcl
 locals {
-  global = read_terragrunt_config(find_in_parent_folders("global.hcl")).locals
+  global = read_terragrunt_config(find_in_parent_folders("common-env.hcl")).locals
   environment = "dev"
   region = "ap-southeast-1"
   region_short = try(local.global.region_short_map[local.region], "unknown")
@@ -302,7 +302,7 @@ locals {
 
 ```hcl
 locals {
-  global = read_terragrunt_config(find_in_parent_folders("global.hcl")).locals
+  global = read_terragrunt_config(find_in_parent_folders("common-env.hcl")).locals
   environment = "dev"
   region = "ap-southeast-1"
   region_short = try(local.global.region_short_map[local.region], "unknown")
@@ -315,7 +315,7 @@ locals {
 ## Enforcement
 
 Naming conventions are enforced via:
-- `global.hcl` - Centralized project name and region mapping
+- `common-env.hcl` - Centralized project name and region mapping
 - `live/{env}/env.hcl` - Environment-specific tags
 - Path-based extraction - Environment and region extracted from directory structure
 - Terraform validation rules - Validate names in modules

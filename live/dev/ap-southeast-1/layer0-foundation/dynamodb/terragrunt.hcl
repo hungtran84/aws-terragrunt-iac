@@ -4,9 +4,9 @@
 # Load configuration files
 locals {
   # Load global configuration
-  global = read_terragrunt_config(find_in_parent_folders("global.hcl")).locals
+  global = read_terragrunt_config(find_in_parent_folders("common-env.hcl")).locals
   
-  # Extract path components: live/{env}/{region}/...
+  # Read environment configuration
   path_parts = split("/", get_terragrunt_dir())
   live_index = index(local.path_parts, "live")
   

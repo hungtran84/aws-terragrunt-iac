@@ -5,7 +5,7 @@ terraform {
   required_version = ">= 1.0"
 
   # Backend configuration - will be configured by Terragrunt
-  backend "s3" {}
+  # backend "s3" {}
 
   required_providers {
     aws = {
@@ -269,63 +269,5 @@ data "aws_caller_identity" "current" {}
 data "aws_region" "current" {}
 
 ################################################################################
-# Karpenter Bootstrap Integration
+# Karpenter: Removed as per repository cleanup request
 ################################################################################
-
-module "karpenter" {
-  source = "../../eks-bootstrap/karpenter"
-  count  = var.enable_karpenter ? 1 : 0
-
-  aws_region                         = var.aws_region != "" ? var.aws_region : data.aws_region.current.name
-  cluster_name                       = module.eks.cluster_name
-  cluster_endpoint                   = module.eks.cluster_endpoint
-  cluster_certificate_authority_data = module.eks.cluster_certificate_authority_data
-  oidc_provider_arn                  = module.eks.oidc_provider_arn
-  oidc_provider_url                  = module.eks.cluster_oidc_issuer_url
-
-  namespace     = var.karpenter_namespace
-  chart_version = var.karpenter_chart_version
-  replicas      = var.karpenter_replicas
-
-  controller_resources = var.karpenter_controller_resources
-
-  # Auto-tag subnets and security groups for Karpenter discovery
-  subnet_selector_tags = {
-    "karpenter.sh/discovery" = module.eks.cluster_name
-  }
-
-  security_group_selector_tags = {
-    "karpenter.sh/discovery" = module.eks.cluster_name
-  }
-
-  tags = merge(
-    var.common_tags,
-    {
-      "company/component" = "karpenter"
-      "company/layer"     = "bootstrap"
-    }
-  )
-
-  depends_on = [
-    module.eks,
-    aws_iam_role.ebs_csi_driver
-  ]
-}
-
-# Auto-tag subnets for Karpenter discovery
-resource "aws_ec2_tag" "karpenter_subnet_discovery" {
-  for_each = var.enable_karpenter ? toset(var.private_subnet_ids) : []
-
-  resource_id = each.value
-  key         = "karpenter.sh/discovery"
-  value       = var.cluster_name
-}
-
-# Auto-tag node security group for Karpenter discovery
-resource "aws_ec2_tag" "karpenter_sg_discovery" {
-  count = var.enable_karpenter ? 1 : 0
-
-  resource_id = module.eks.node_security_group_id
-  key         = "karpenter.sh/discovery"
-  value       = var.cluster_name
-}

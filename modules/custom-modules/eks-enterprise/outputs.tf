@@ -80,31 +80,3 @@ output "ebs_csi_driver_iam_role_name" {
   value       = try(aws_iam_role.ebs_csi_driver[0].name, null)
 }
 
-################################################################################
-# Karpenter Outputs
-################################################################################
-
-output "karpenter_enabled" {
-  description = "Whether Karpenter is enabled"
-  value       = var.enable_karpenter
-}
-
-output "karpenter_controller_iam_role_arn" {
-  description = "IAM role ARN for Karpenter controller"
-  value       = var.enable_karpenter ? module.karpenter[0].controller_iam_role_arn : null
-}
-
-output "karpenter_node_instance_profile_name" {
-  description = "Instance profile name for Karpenter-provisioned nodes"
-  value       = var.enable_karpenter ? module.karpenter[0].node_instance_profile_name : null
-}
-
-output "karpenter_node_iam_role_arn" {
-  description = "IAM role ARN for Karpenter-provisioned nodes"
-  value       = var.enable_karpenter ? module.karpenter[0].node_iam_role_arn : null
-}
-
-output "karpenter_namespace" {
-  description = "Kubernetes namespace where Karpenter is installed"
-  value       = var.enable_karpenter ? var.karpenter_namespace : null
-}
