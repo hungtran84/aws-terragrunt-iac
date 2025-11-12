@@ -24,8 +24,9 @@ locals {
   # Region shortening - use the global region mapping (same logic as root.hcl)
   region_short = try(local.global.region_short_map[local.region], local.region)
   
-  # EKS cluster name using dynamic values with shortened region (matches root.hcl logic)
-  cluster_name = "${local.project_name}-${local.environment}-${local.region_short}-eks-${local.eks_instance}"
+  # EKS cluster name using dynamic values (further shortened for AWS IAM limits)
+  # Max 38 chars for IAM role prefix: acme-dev-apne2-eks-cluster1 = ~26 chars
+  cluster_name = "acme-${local.environment}-${local.region_short}-eks-${local.eks_instance}"
 }
 
 terraform {
